@@ -1,6 +1,6 @@
 library(shiny)
 library(datasets)
-library(ggplot2)
+#library(ggplot2)
 library(rmarkdown)
 library(knitr)
 library(pander)
