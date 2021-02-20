@@ -1,0 +1,12 @@
+name: CSVdatainput
+title: CSVdatainput
+username:
+account: machinelearningapp
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3666628
+bundleId: 4247923
+url: https://machinelearningapp.shinyapps.io/CSVdatainput/
+when: 1613807437.76143
+asMultiple: FALSE
+asStatic: FALSE
