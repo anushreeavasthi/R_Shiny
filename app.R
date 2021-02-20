@@ -1,9 +1,9 @@
 library(shiny)
 library(datasets)
 #library(ggplot2)
-library(rmarkdown)
-library(knitr)
-library(pander)
+#library(rmarkdown)
+#library(knitr)
+#library(pander)
 
 
 ui <- shinyUI(fluidPage(
