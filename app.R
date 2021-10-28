@@ -5,7 +5,7 @@
 # Find out more about building applications with Shiny here:
 #
 #    http://shiny.rstudio.com/
-#
+# developed by Anushree Avasthi and Aditya Agrawal
 
 library(shiny)
 library(shinythemes)
