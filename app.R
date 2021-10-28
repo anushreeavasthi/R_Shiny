@@ -1,340 +1,291 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
 library(shiny)
-library(datasets)
-#library(ggplot2)
-#library(rmarkdown)
-#library(knitr)
-#library(pander)
+library(shinythemes)
+library(DT)
+library(ggplot2)
 
 
-ui <- shinyUI(fluidPage(
-    titlePanel("Quick Data Insights"),
-    tabsetPanel(
-        tabPanel("Upload File",
-                 titlePanel("Uploading Files"),
-                 sidebarLayout(
-                     sidebarPanel(
-                         fileInput('file1', 'Choose CSV File',
-                                   accept=c('text/csv', 
-                                            'text/comma-separated-values,text/plain', 
-                                            '.csv')),
-                         
-                         # added interface for uploading data from
-                         # http://shiny.rstudio.com/gallery/file-upload.html
-                         tags$br(),
-                         checkboxInput('header', 'Header', TRUE),
-                         radioButtons('sep', 'Separator',
-                                      c(Comma=',',
-                                        Semicolon=';',
-                                        Tab='\t'),
-                                      ','),
-                         radioButtons('quote', 'Quote',
-                                      c(None='',
-                                        'Double Quote'='"',
-                                        'Single Quote'="'"),
-                                      '"')
-                         
-                     ),
-                     mainPanel(
-                         tableOutput('contents')
-                     )
-                 )
-        ),
-        tabPanel("Graph view",
-                 pageWithSidebar(
-                     headerPanel('My First Plot'),
-                     sidebarPanel(
-                         
-                         # "Empty inputs" - they will be updated after the data is uploaded
-                         selectInput('xcol', 'X Variable', ""),
-                         selectInput('ycol', 'Y Variable', "", selected = "")
-                         
-                     ),
-                     mainPanel(
-                         plotOutput('MyPlot')
-                     )
-                 )
-        ),
-        
-        tabPanel("Column Insights",
-                 fluidPage(
-                     titlePanel("My first Shiny app!"),
-                     sidebarLayout(
-                         sidebarPanel(
-                             selectInput("depVar",label="Choose a variable",choice=c("Sepal.Length"=1,
-                                                                                  "Sepal.Width"=2,
-                                                                                  "Petal.Length"=3,
-                                                                                  "Petal.Width"=4), selectize=FALSE),
-                         selectInput("indVar",label="Choose a variable",choice=c("Sepal.Length"=1,
-                                                                                 "Sepal.Width"=2,
-                                                                                 "Petal.Length"=3,
-                                                                                 "Petal.Width"=4), selectize=FALSE)),
-                         mainPanel(
-                             h2("Summary of the variable"),
-                             verbatimTextOutput("sum"),
-                             plotOutput("box")
-                         )
-                     ))
-        ),
-        
-        
-        tabPanel("Linear Regression",
-                 sidebarLayout(
-                     sidebarPanel(
-                         tags$b("Data:"),
-                         textInput("x", "x", value = "90, 100, 90, 80, 87, 75", placeholder = "Enter values separated by a comma with decimals as points, e.g. 4.2, 4.4, 5, 5.03, etc."),
-                         textInput("y", "y", value = "950, 1100, 850, 750, 950, 775", placeholder = "Enter values separated by a comma with decimals as points, e.g. 4.2, 4.4, 5, 5.03, etc."),
-                         hr(),
-                         tags$b("Plot:"),
-                         checkboxInput("se", "Add confidence interval around the regression line", TRUE),
-                         textInput("xlab", label = "Axis labels:", value = "x", placeholder = "x label"),
-                         textInput("ylab", label = NULL, value = "y", placeholder = "y label"),
-                         hr()
-                          ),
-                     
-                     mainPanel(
-                         tags$b("Your data:"),
-                         DT::dataTableOutput("tbl"),
-                         br(),
-                         uiOutput("data"),
-                         br(),
-                         tags$b("Compute parameters by hand:"),
-                         uiOutput("by_hand"),
-                         br(),
-                         tags$b("Compute parameters in R:"),
-                         verbatimTextOutput("summary"),
-                         br(),
-                         tags$b("Regression plot:"),
-                         uiOutput("results"),
-                         plotlyOutput("plot"),
-                         br(),
-                         tags$b("Interpretation:"),
-                         uiOutput("interpretation"),
-                         br(),
-                         br()
-                     )
-                 )
-        )
-        
-    )
-)
-)
-
-
-server <- shinyServer(function(input, output, session) {
-    # added "session" because updateSelectInput requires it
-    
-    extract <- function(text) {
-        text <- gsub(" ", "", text)
-        split <- strsplit(text, ",", fixed = FALSE)[[1]]
-        as.numeric(split)
-    }
-    
-    # Data output
-    output$tbl <- DT::renderDataTable({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        DT::datatable(data.frame(x, y),
-                      extensions = "Buttons",
-                      options = list(
-                          lengthChange = FALSE,
-                          dom = "Blfrtip",
-                          buttons = c("copy", "csv", "excel", "pdf", "print")
-                      )
-        )
-    })
-    
-    output$data <- renderUI({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        if (anyNA(x) | length(x) < 2 | anyNA(y) | length(y) < 2) {
-            "Invalid input or not enough observations"
-        } else if (length(x) != length(y)) {
-            "Number of observations must be equal for x and y"
-        } else {
-            withMathJax(
-                paste0("\\(\\bar{x} =\\) ", round(mean(x), 3)),
-                br(),
-                paste0("\\(\\bar{y} =\\) ", round(mean(y), 3)),
-                br(),
-                paste0("\\(n =\\) ", length(x))
-            )
-        }
-    })
-    
-    
-    output$by_hand <- renderUI({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        fit <- lm(y ~ x)
-        withMathJax(
-            paste0("\\(\\hat{\\beta}_1 = \\dfrac{\\big(\\sum^n_{i = 1} x_i y_i \\big) - n \\bar{x} \\bar{y}}{\\sum^n_{i = 1} (x_i - \\bar{x})^2} = \\) ", round(fit$coef[[2]], 3)),
-            br(),
-            paste0("\\(\\hat{\\beta}_0 = \\bar{y} - \\hat{\\beta}_1 \\bar{x} = \\) ", round(fit$coef[[1]], 3)),
-            br(),
-            br(),
-            paste0("\\( \\Rightarrow y = \\hat{\\beta}_0 + \\hat{\\beta}_1 x = \\) ", round(fit$coef[[1]], 3), " + ", round(fit$coef[[2]], 3), "\\( x \\)")
-        )
-    })
-    
-    output$summary <- renderPrint({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        fit <- lm(y ~ x)
-        summary(fit)
-    })
-    
-    output$results <- renderUI({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        fit <- lm(y ~ x)
-        withMathJax(
-            paste0(
-                "Adj. \\( R^2 = \\) ", round(summary(fit)$adj.r.squared, 3),
-                ", \\( \\beta_0 = \\) ", round(fit$coef[[1]], 3),
-                ", \\( \\beta_1 = \\) ", round(fit$coef[[2]], 3),
-                ", P-value ", "\\( = \\) ", signif(summary(fit)$coef[2, 4], 3)
-            )
-        )
-    })
-    
-    output$interpretation <- renderUI({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        fit <- lm(y ~ x)
-        if (summary(fit)$coefficients[1, 4] < 0.05 & summary(fit)$coefficients[2, 4] < 0.05) {
-            withMathJax(
-                paste0("(Make sure the assumptions for linear regression (independance, linearity, normality and homoscedasticity) are met before interpreting the coefficients.)"),
-                br(),
-                paste0("For a (hypothetical) value of ", input$xlab, " = 0, the mean of ", input$ylab, " = ", round(fit$coef[[1]], 3), "."),
-                br(),
-                paste0("For an increase of one unit of ", input$xlab, ", ", input$ylab, ifelse(round(fit$coef[[2]], 3) >= 0, " increases (on average) by ", " decreases (on average) by "), abs(round(fit$coef[[2]], 3)), ifelse(abs(round(fit$coef[[2]], 3)) >= 2, " units", " unit"), ".")
-            )
-        } else if (summary(fit)$coefficients[1, 4] < 0.05 & summary(fit)$coefficients[2, 4] >= 0.05) {
-            withMathJax(
-                paste0("(Make sure the assumptions for linear regression (independance, linearity, normality and homoscedasticity) are met before interpreting the coefficients.)"),
-                br(),
-                paste0("For a (hypothetical) value of ", input$xlab, " = 0, the mean of ", input$ylab, " = ", round(fit$coef[[1]], 3), "."),
-                br(),
-                paste0("\\( \\beta_1 \\)", " is not significantly different from 0 (p-value = ", round(summary(fit)$coefficients[2, 4], 3), ") so there is no significant relationship between ", input$xlab, " and ", input$ylab, ".")
-            )
-        } else if (summary(fit)$coefficients[1, 4] >= 0.05 & summary(fit)$coefficients[2, 4] < 0.05) {
-            withMathJax(
-                paste0("(Make sure the assumptions for linear regression (independance, linearity, normality and homoscedasticity) are met before interpreting the coefficients.)"),
-                br(),
-                paste0("\\( \\beta_0 \\)", " is not significantly different from 0 (p-value = ", round(summary(fit)$coefficients[1, 4], 3), ") so when ", input$xlab, " = 0, the mean of ", input$ylab, " is not significantly different from 0."),
-                br(),
-                paste0("For an increase of one unit of ", input$xlab, ", ", input$ylab, ifelse(round(fit$coef[[2]], 3) >= 0, " increases (on average) by ", " decreases (on average) by "), abs(round(fit$coef[[2]], 3)), ifelse(abs(round(fit$coef[[2]], 3)) >= 2, " units", " unit"), ".")
-            )
-        } else {
-            withMathJax(
-                paste0("(Make sure the assumptions for linear regression (independance, linearity, normality and homoscedasticity) are met before interpreting the coefficients.)"),
-                br(),
-                paste0("\\( \\beta_0 \\)", " and ", "\\( \\beta_1 \\)", " are not significantly different from 0 (p-values = ", round(summary(fit)$coefficients[1, 4], 3), " and ", round(summary(fit)$coefficients[2, 4], 3), ", respectively) so the mean of ", input$ylab, " is not significantly different from 0.")
-            )
-        }
-    })
-    
-    output$plot <- renderPlotly({
-        y <- extract(input$y)
-        x <- extract(input$x)
-        fit <- lm(y ~ x)
-        dat <- data.frame(x, y)
-        p <- ggplot(dat, aes(x = x, y = y)) +
-            geom_point() +
-            stat_smooth(method = "lm", se = input$se) +
-            ylab(input$ylab) +
-            xlab(input$xlab) +
-            theme_minimal()
-        ggplotly(p)
-    })
-    
-    output$downloadReport <- downloadHandler(
-        filename = function() {
-            paste("my-report", sep = ".", switch(
-                input$format, PDF = "pdf", HTML = "html", Word = "docx"
-            ))
-        },
-        
-        content = function(file) {
-            src <- normalizePath("report.Rmd")
-            
-            # temporarily switch to the temp dir, in case you do not have write
-            # permission to the current working directory
-            owd <- setwd(tempdir())
-            on.exit(setwd(owd))
-            file.copy(src, "report.Rmd", overwrite = TRUE)
-            
-            library(rmarkdown)
-            out <- render("report.Rmd", switch(
-                input$format,
-                PDF = pdf_document(), HTML = html_document(), Word = word_document()
-            ))
-            file.rename(out, file)
-        }
-    )
-    
-    
-    
-    data <- reactive({ 
-        req(input$file1) ## ?req #  require that the input is available
-        
-        inFile <- input$file1 
-        
-        # tested with a following dataset: write.csv(mtcars, "mtcars.csv")
-        # and                              write.csv(iris, "iris.csv")
-        df <- read.csv(inFile$datapath, header = input$header, sep = input$sep,
-                       quote = input$quote)
-        
-        
-        # Update inputs (you could create an observer with both updateSel...)
-        # You can also constraint your choices. If you wanted select only numeric
-        # variables you could set "choices = sapply(df, is.numeric)"
-        # It depends on what do you want to do later on.
-        
-        updateSelectInput(session, inputId = 'xcol', label = 'X Variable',
-                          choices = names(df), selected = names(df))
-        updateSelectInput(session, inputId = 'ycol', label = 'Y Variable',
-                          choices = names(df), selected = names(df)[2])
-        
-        #Input variables for linear regression
-        updateSelectInput(session, inputId = 'indVar', label = 'X Variable',
-                          choices = names(df), selected = names(df))
-        updateSelectInput(session, inputId = 'depVar', label = 'Y Variable',
-                          choices = names(df), selected = names(df)[2])
-        
-        return(df)
-    })
-    
+server = function (input, output, session){
+ 
+    #To download the user inputted file
+   
     output$contents <- renderTable({
-        data()
+       
+        # input$file1 will be NULL initially. After the user selects
+        # and uploads a file, head of that data file by default,
+        # or all rows if selected, will be shown.
+       
+        req(input$file1)
+       
+        df <- read.csv(input$file1$datapath,
+                       header = input$header,
+                       sep = input$sep,
+                       quote = input$quote)
+       
+        if(input$disp == "head") {
+            return(head(df))
+        }
+        else {
+            return(df)
+        }
+       
     })
-    
+   
+    #render table inputted by user
+    output$tableDT <- DT::renderDataTable(read.csv(input$file1$datapath,
+                                                   header = input$header,
+                                                   sep = input$sep,
+                                                   quote = input$quote),
+                                          options= list(paging=T),
+                                          rownames=T, filter="top")
+   
+    #Download the table rendered by user
+    completeTable <- reactive({
+      tableDT <-  read.csv(input$file1$datapath,
+                           header = input$header,
+                           sep = input$sep,
+                           quote = input$quote)
+      return(tableDT)
+    })
+   
+   
+    output$fulldownload <- downloadHandler(
+      filename= "FullTable.csv",
+      content= function(file){
+        write.csv(completeTable(),file)
+      }
+    )
+   
+   
+   
+   
+   
+   
+    #implementation of observe
+    #just copies text from input to output box
+    observe({
+        addText <- paste("Your initial input value is:", input$myString)
+        updateTextInput (session, "myString2", value=addText)
+    })
+ 
+   #Plotting the table
+    output$plotYourTable <- renderPlot({
+        ggplot(iris, aes(Sepal.Length, Sepal.Width)) + geom_line()
+    })
+   
+    data <- reactive({
+        user_brush <- input$user_brush
+        sel <- brushedPoints(iris, user_brush)
+        return (sel)
+    })
+   
+ 
+    output$tableSelection <- DT::renderDataTable(DT::datatable(data()))
+   
+    output$customdownload <- downloadHandler(
+        filename= "CustomTable.csv",
+        content= function(file){
+            write.csv(data(),file)
+        }
+    )
+   
+    #Adding graph based on user input
+    data <- reactive({
+      req(input$file1$datapath) ## ?req #  require that the input is available
+     
+      inFile <- input$file1$datapath
+     
+      # tested with a following dataset: write.csv(mtcars, "mtcars.csv")
+      # and                              write.csv(iris, "iris.csv")
+      df <-  read.csv(input$file1$datapath,
+                      header = input$header,
+                      sep = input$sep,
+                      quote = input$quote)
+     
+     
+      # Update inputs (you could create an observer with both updateSel...)
+      # You can also constraint your choices. If you wanted select only numeric
+      # variables you could set "choices = sapply(df, is.numeric)"
+      # It depends on what do you want to do later on.
+     
+      updateSelectInput(session, inputId = 'xcol', label = 'X Variable',
+                        choices = names(df), selected = names(df))
+      updateSelectInput(session, inputId = 'ycol', label = 'Y Variable',
+                        choices = names(df), selected = names(df)[2])
+     
+      return(df)
+   
+    })
+   
+    #Plotting the user inputs taken
+   
     output$MyPlot <- renderPlot({
-        # for a histogram: remove the second variable (it has to be numeric as well):
-        # x    <- data()[, c(input$xcol, input$ycol)]
-        # bins <- nrow(data())
-        # hist(x, breaks = bins, col = 'darkgray', border = 'white')
-        
-        # Correct way:
-        # x    <- data()[, input$xcol]
-        # bins <- nrow(data())
-        # hist(x, breaks = bins, col = 'darkgray', border = 'white')
-        
-        
-        # I Since you have two inputs I decided to make a scatterplot
-        x <- data()[, c(input$xcol, input$ycol)]
-        plot(x)
-        
+      x <- data()[, c(input$xcol, input$ycol)]
+      plot(x)
+     
     })
-
-    
-    output$sum <- renderPrint({
-        
-        lm1 <- reactive({lm(reformulate(input$IndVar, input$DepVar))})
-        summary(lm1)
+   
+    #Doing linear regression based on user input
+    data_for_linear_regression <- reactive({
+      req(input$file1$datapath) ## ?req #  require that the input is available
+     
+    #  inFile <- input$file1$datapath
+     
+      # tested with a following dataset: write.csv(mtcars, "mtcars.csv")
+      # and                              write.csv(iris, "iris.csv")
+      df_lr <-  read.csv(input$file1$datapath,
+                      header = input$header,
+                      sep = input$sep,
+                      quote = input$quote)
+     
+     
+      # Update inputs (you could create an observer with both updateSel...)
+      # You can also constraint your choices. If you wanted select only numeric
+      # variables you could set "choices = sapply(df, is.numeric)"
+      # It depends on what do you want to do later on.
+     
+      updateSelectInput(session, inputId = 'xcolumn', label = 'Dependent variable',
+                        choices = names(df_lr), selected = names(df_lr))
+      updateSelectInput(session, inputId = 'ycolumn', label = 'Independent variable',
+                        choices = names(df_lr), selected = names(df_lr)[2])
+     
+      return(df_lr)
+     
     })
-    
-  
-})
+   
+    extract <- function(text) {
+      text <- gsub(" ", "", text)
+      split <- strsplit(text, ",", fixed = FALSE)[[1]]
+      as.numeric(split)
+    }
+   
+    output$summary <- renderPrint({
+      x <- data_for_linear_regression ()[, input$xcolumn ]
+      y <- data_for_linear_regression ()[, input$ycolumn ]
+      fit <- lm(y ~ x)
+      summary(fit)
+    })
+   
+ 
+   
+}
 
-shinyApp(ui, server)
+
+ui = fluidPage(theme= shinytheme("cerulean"),
+   
+    navbarPage("Data Insights",
+               tabPanel("Insert your file",
+                        # Sidebar layout with input and output definitions ----
+                        sidebarLayout(
+                           
+                            # Sidebar panel for inputs ----
+                            sidebarPanel(
+                                # Input: Select a file ----
+                                fileInput("file1", "Choose CSV File",
+                                          multiple = TRUE,
+                                          accept = c("text/csv",
+                                                     "text/comma-separated-values,text/plain",
+                                                     ".csv")),
+                                # Horizontal line ----
+                                tags$hr(),
+                                # Input: Checkbox if file has header ----
+                                checkboxInput("header", "Header", TRUE),
+                                # Input: Select separator ----
+                                radioButtons("sep", "Separator",
+                                             choices = c(Comma = ",",
+                                                         Semicolon = ";",
+                                                         Tab = "\t"),
+                                             selected = ","),
+                                # Input: Select quotes ----
+                                radioButtons("quote", "Quote",
+                                             choices = c(None = "",
+                                                         "Double Quote" = '"',
+                                                         "Single Quote" = "'"),
+                                             selected = '"'),
+                               
+                                # Horizontal line ----
+                                tags$hr(),
+                               
+                                # Input: Select number of rows to display ----
+                                radioButtons("disp", "Display",
+                                             choices = c(Head = "head",
+                                                         All = "all"),
+                                             selected = "head")
+                               
+                            ),
+                           
+                            # Main panel for displaying outputs ----
+                            mainPanel(
+                               
+                                # Output: Data file ----
+                               h1("Here is what you can do next:"),
+                               h3("1. Upload or import (option available later) your data table"),
+                               h3("2. Go ahead to View data table to see your downloadable data table "),
+                               h3("3. Head over to graph view to vary x and y columns and see your plots"),
+                               h3("4. Go ahead and perform linear regressions of your choice")
+                               
+                            )
+                           
+                        )),
+                tabPanel("View Data Table",
+                         DT::dataTableOutput("tableDT"),
+                         downloadButton(outputId="fulldownload", label="Download Table")),
+               tabPanel("View data graphically",
+                        pageWithSidebar(
+                          headerPanel('My Data plot'),
+                          sidebarPanel(
+                           
+                            # "Empty inputs" - they will be updated after the data is uploaded
+                            selectInput('xcol', 'X Variable', ""),
+                            selectInput('ycol', 'Y Variable', "", selected = "")
+                           
+                          ),
+                          mainPanel(
+                            plotOutput('MyPlot')
+                          )
+                        )
+               ),
+               tabPanel("Linear Regression",
+                        pageWithSidebar(
+                          headerPanel('My Linear plot'),
+                          sidebarPanel(
+                           
+                            # "Empty inputs" - they will be updated after the data is uploaded
+                            selectInput('xcolumn', 'X Variable', ""),
+                            selectInput('ycolumn', 'Y Variable', "", selected = "")
+                           
+                          ),
+                          mainPanel(
+                            tags$b("Compute parameters in R:"),
+                            verbatimTextOutput("summary"),
+                            br()
+                          )
+                       
+               )
+               ),
+               tabPanel("View Selection Data Table",
+                        plotOutput("plotYourTable", brush= "user_brush"),
+                        DT::dataTableOutput("tableSelection"),
+                        downloadButton(outputId="customdownload", label="Download selected")),
+               tabPanel("Copy input string example",
+                        #data input for observe
+                        #just copies text from input to output box
+                        h1("Output text from input using observe"),
+                        textInput("myString","Give a value"),
+                        textInput("myString2","Your full output"),
+                        checkboxInput("myCheckbox", "Factor X") )
+            )
+        )
+
+
+
+# Run the application
+shinyApp(ui = ui, server = server)
